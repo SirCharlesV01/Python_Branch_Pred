@@ -114,6 +114,8 @@ class tournament_pred:
 def main():
     #Initialize cache
     user_cache = cache(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+
+    #Run simulation
     user_cache.predictor.simulate()
 
 if __name__ == "__main__":
