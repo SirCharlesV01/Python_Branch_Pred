@@ -14,3 +14,7 @@ The predictors available for simulation are:
 ## Execution
 
 In order to execute the simulation, open a terminal on the source directory, and run `gunzip -c ./branch-trace-gcc.trace.gz | ./branch.py <s> <bp> <gh> <ph>`. Where 's' is the size of the BTH table, 'bp' is predictor type (accepted values are 0, 1, 2 and 3, corresponding to bimodal, global, private and tournament predictors respectively), 'gh' is the global prediction registry size, and 'ph' is the private prediction registry size. You could, for example execute `gunzip -c ./branch-trace-gcc.trace.gz | ./branch.py 4 0 4 3` to observe quick results
+
+## Requirements
+1. Must have gzip installed
+2. Must have Python 3 installed
