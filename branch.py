@@ -40,15 +40,6 @@ class cache:
 
         self.params = [s, bp, gh, ph] #params are assigned
 
-        self.instruction_dir = []   #instruction directions list, to be read from trace file
-        self.jump_taken = []        #jump taken (T) or not taken (N) list, to be read from trace file
-
-        print('Reading trace file...')
-        for line in sys.stdin:      #Reading the decompressed trace file from pipe, saving columns into corresponding lists
-            line = line.partition(' ')
-            self.instruction_dir.append(line[0])
-            self.jump_taken.append(line[-1])
-
         #-----BUILD THE CORRESPONDING PREDICTOR-----#    
         if self.params[1] == '0':
             self.predictor = bimodal_pred()
@@ -70,20 +61,10 @@ class bimodal_pred:
         print('Initializing bimodal predictor...')
         return
 
-    def simulate(self):
-        print('Running simulation...')
-        return
-
-
-
 class global_history_pred:
     def __init__(self, reg_size):
         print('Initializing global history predictor...')
         self.reg_size = reg_size
-        return
-
-    def simulate(self):
-        print('Running simulation...')
         return
 
 class private_history_pred:
@@ -92,18 +73,25 @@ class private_history_pred:
         self.reg_size = reg_size
         return
 
-    def simulate(self):
-        print('Running simulation...')
-        return
-
-
 class tournament_pred:
     def __init__(self):
         print('Initializing tournament predictor...')
         return
 
-    def simulate(self):
-        print('Running simulation...')
+#-----SIMULATOR CLASS-----#
+
+class simulator:
+    def __init__(self):
+        print('Initializing simulation...')
+
+        self.instruction_dir = []   #instruction directions list, to be read from trace file
+        self.jump_taken = []        #jump taken (T) or not taken (N) list, to be read from trace file
+
+        print('Reading trace file...')
+        for line in sys.stdin:      #Reading the decompressed trace file from pipe, saving columns into corresponding lists
+            line = line.partition(' ')
+            self.instruction_dir.append(line[0])
+            self.jump_taken.append(line[-1])
         return
 
 
@@ -115,8 +103,8 @@ def main():
     #Initialize cache
     user_cache = cache(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
 
-    #Run simulation
-    user_cache.predictor.simulate()
+    #Initialize simulation
+    sim = simulator()
 
 if __name__ == "__main__":
         main()
