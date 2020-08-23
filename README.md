@@ -1,2 +1,2 @@
-# Python_Branch_Pred
+# Python branch prediction
 Branch prediction simulations, implemented on Python
