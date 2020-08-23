@@ -48,53 +48,73 @@ class cache:
             line = line.partition(' ')
             self.instruction_dir.append(line[0])
             self.jump_taken.append(line[-1])
-            
 
-        return
-
-
-    #-----PREDICTORS-----#
-
-    def bimodal(self):
-        print("Running bimodal predictor simulation...")
-        return
-
-    def history_global(self):
-        print("Running global history predictor simulation...")
-        return
-
-    def history_private(self):
-        print("Running private history predictor simulation...")
-        return
-
-    def tournament(self):
-        print("Running tournament predictor simulation...")
-        return
-
-
-    #-----SIMULATION RELATED FUNCTIONS-----#
-
-    def run_simulation(self):       #Switch to the correct predictor according to the user defined "bp" parameter
+        #-----BUILD THE CORRESPONDING PREDICTOR-----#    
         if self.params[1] == '0':
-            self.bimodal()
+            self.predictor = bimodal_pred()
         elif self.params[1] == '1':
-            self.history_global()
+            self.predictor = global_history_pred(gh)
         elif self.params[1] == '2':
-            self.history_private()
+            self.predictor = private_history_pred(ph)
         elif self.params[1] == '3':
-            self.tournament()
+            self.predictor = tournament_pred()
         else:
             return
+
+
+
+#-----PREDICTOR CLASSES-----#
+
+class bimodal_pred:
+    def __init__(self):
+        print('Initializing bimodal predictor...')
+        return
+
+    def simulate(self):
+        print('Running simulation...')
+        return
+
+
+
+class global_history_pred:
+    def __init__(self, reg_size):
+        print('Initializing global history predictor...')
+        self.reg_size = reg_size
+        return
+
+    def simulate(self):
+        print('Running simulation...')
+        return
+
+class private_history_pred:
+    def __init__(self, reg_size):
+        print('Initializing private history predictor...')
+        self.reg_size = reg_size
+        return
+
+    def simulate(self):
+        print('Running simulation...')
+        return
+
+
+class tournament_pred:
+    def __init__(self):
+        print('Initializing tournament predictor...')
+        return
+
+    def simulate(self):
+        print('Running simulation...')
+        return
+
+
 
 
 
 #-----MAIN FUNCTION-----#
 def main():
     #Initialize cache
-    sim_cache = cache(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
-
-    #run simulation
-    sim_cache.run_simulation()
+    user_cache = cache(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
+    user_cache.predictor.simulate()
 
 if __name__ == "__main__":
         main()
