@@ -52,9 +52,9 @@ class simulator:
         if self.params[1] == 0:
             self.predictor = bimodal_pred(self.params[0], self.pc_bits, self.actual_jump_list)
         elif self.params[1] == 1:
-            self.predictor = global_history_pred(gh)
+            self.predictor = private_history_pred(self.params[0], self.params[3], self.pc_bits, self.actual_jump_list)
         elif self.params[1] == 2:
-            self.predictor = private_history_pred(ph)
+            self.predictor = global_history_pred(gh)
         elif self.params[1] == 3:
             self.predictor = tournament_pred()
         return
@@ -99,9 +99,10 @@ class bimodal_pred:
 
     def __init__(self,s,pc_bits,actual_jump_list):
         print('Initializing bimodal predictor...')
+        bht_size = 2 ** s #bth size is given by 2^s
         self.pc_bits = pc_bits
         self.actual_jump_list = actual_jump_list
-        self.bht = [0] * (2 ** s)
+        self.bht = [0] * bht_size #bht initialized with zero vals, (0 = strongly not taken, **defined arbitrarily for simplicity)
         return
     
     def get_jumps(self): #will return the predicted jumps
@@ -111,12 +112,14 @@ class bimodal_pred:
 
         for i in range(len(self.actual_jump_list)): #iterates over instructions, predicts jumps and updates BHT according to the actual jumps made
             predicted_jumps.append(self.predict(self.pc_bits[i]))   #computes the i-th prediction
-            self.update_bth(i)                                      #updates BHT on i-th jump value
+            self.update_bht(i)                                      #updates BHT on i-th jump value
 
         print('Done!')
         return predicted_jumps
         
-    def update_bth(self, i):  #updates the BHT according to the jump value of the i-th instruction
+    #For the following functions, it is not necesary to check individual bit values, so we will work with int values
+
+    def update_bht(self, i):  #updates the BHT according to the jump value of the i-th instruction
         bits = self.pc_bits[i]
         if self.bht[int(bits,2)] >= 0 and self.bht[int(bits,2)] < 3 and self.actual_jump_list[i] == 'T':
             self.bht[int(bits,2)] += 1
@@ -126,9 +129,9 @@ class bimodal_pred:
             return
 
     def predict(self, bits): #returns 'N' or 'T' char, depending on prediction for jump on given PC bits value
-        if self.bht[int(bits,2)] < 2:
+        if self.bht[int(bits,2)] < 2: #if value in bht is 0 (strongly NT) or 1 (weakly NT) prediction is NT
             return 'N'
-        elif self.bht[int(bits,2)] > 1:
+        elif self.bht[int(bits,2)] > 1: #if value in bht is 2 (weakly T) or 3 (strongly T) prediction is T
             return 'T'
 
 
@@ -136,7 +139,7 @@ class bimodal_pred:
 
 class global_history_pred:
 
-    def __init__(self, reg_size):
+    def __init__(self,reg_size):
         print('Initializing global history predictor...')
         self.reg_size = reg_size
         return
@@ -151,16 +154,88 @@ class global_history_pred:
 
 class private_history_pred:
 
-    def __init__(self, reg_size):
+    def __init__(self,s, ph, pc_bits,actual_jump_list):
         print('Initializing private history predictor...')
-        self.reg_size = reg_size
+        bht_size =  2 ** ph
+        pht_size = 2 ** s
+        self.ph = ph
+        self.pc_bits = pc_bits
+        self.actual_jump_list = actual_jump_list
+        self.bht = [[[0,1]]*bht_size]*bht_size #BHT table, dimensions of 2^ph x 2^ph with 2BC per entry; initialized in strongly not taken state
+        self.pht = [[0]*ph] * pht_size
         return
 
     def get_jumps(self): #will return the predicted jumps **WIP
         print('Predicting jumps...')
-        return
+        predicted_jumps = []    #predicted jumps list to be returned by function
+
+        for i in range(len(self.actual_jump_list)): #iterates over instructions, predicts jumps and updates BHT according to the actual jumps made
+            predicted_jumps.append(self.predict(self.pc_bits[i]))   #computes the i-th prediction
+            self.update_bht_pht(i)                                      #updates BHT on i-th jump value
+
+        print('Done!')
+        return predicted_jumps
+
+    def get_bht_index (self, pc_bits):    #gets BHT index value by performing XOR function between pc_LSbs and PHT corresponding entry
+        pht_bits = self.pht[int(pc_bits,2)]
+        xor_bits = ''
+        bc_index = 0
+        for i in range (self.ph):
+
+            #Get the right column or branch counter index:
+            bc_index += pht_bits[i]* (2**i) 
+
+            #XOR function: gets the right row, or PC entry index
+            if pht_bits[i] == pc_bits[-len(pht_bits)+1:]:
+                xor_bits += '1'
+            else:
+                xor_bits += '0'
+        for bit1, bit2 in zip(pht_bits, pc_bits[-self.ph:]):
+            if (bit1)^int(bit2):
+                xor_bits += '1'
+            else:
+                xor_bits += '0'
+
+        return int(xor_bits,2), bc_index
+
+    def update_bht_pht (self, i):
+        bits = self.pc_bits[i]
+        bht_index, bc_index = self.get_bht_index(bits)
+        if self.actual_jump_list[i] == 'T':
+            #bht is updated:
+            if self.bht[bht_index][bc_index] == [0,1]:
+                self.bht[bht_index][bc_index] = [0,0]
+            elif self.bht[bht_index][bc_index] == [0,0]:
+                self.bht[bht_index][bc_index] = [1,0]
+            elif self.bht[bht_index][bc_index] == [1,0]:
+                self.bht[bht_index][bc_index] = [1,1]
+            else:
+                self.bht[bht_index][bc_index] = self.bht[bht_index][bc_index]
+            #pht is updated (shifting tuple to the left, replacing LSb with 1):
+            self.pht[int(bits, 2)] = self.pht[int(bits, 2)][1:] + [1]
 
 
+        else:
+            #bht is updated:
+            if self.bht[bht_index][bc_index] == [1,1]:
+                self.bht[bht_index][bc_index] = [1,0]
+            elif self.bht[bht_index][bc_index] == [1,0]:
+                self.bht[bht_index][bc_index] = [0,0]
+            elif self.bht[bht_index][bc_index] == [0,0]:
+                self.bht[bht_index][bc_index] = [0,1]
+            else:
+                self.bht[bht_index][bc_index] = self.bht[bht_index][bc_index]
+            #pht is updated (shifting list to the left, replacing LSb with 0):
+            self.pht[int(bits, 2)] = self.pht[int(bits, 2)][1:] + [0]
+
+            
+
+    def predict (self, bits):
+        bht_index, bc_index = self.get_bht_index(bits)
+        if self.bht[bht_index][bc_index][0] == 0:
+            return 'N'
+        else:
+            return 'T'
 
 #Tournament predictor:
 
