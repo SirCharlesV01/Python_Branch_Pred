@@ -17,7 +17,7 @@ import scipy
 #program description
 parser = argparse.ArgumentParser(description='Simulates different branch predictors based on user defined cache parameters')
 #arguments
-parser.add_argument('s', type = int, help = 'BTH table size')
+parser.add_argument('s', type = int, help = 'BHT size')
 parser.add_argument('bp', type = int, help = 'Predictor type')
 parser.add_argument('gh', type = int, help = 'Global history predictor registry size')
 parser.add_argument('ph', type = int, help = 'Private history predictor registry size')
@@ -47,6 +47,7 @@ class simulator:
             self.instruction_dir_list.append(int(str.strip(line[0])))   #direction list appended
             self.pc_bits.append(  bin(self.instruction_dir_list[-1])[-int(self.params[0]):]  ) #Last "s" bits of PC appended
             self.actual_jump_list.append(str.strip(line[-1]))      #actual jumps taken list appended
+
         #-----BUILD THE CORRESPONDING PREDICTOR-----#    
         if self.params[1] == 0:
             self.predictor = bimodal_pred(self.params[0], self.pc_bits, self.actual_jump_list)
@@ -59,8 +60,10 @@ class simulator:
         return
 
 
-    def predict_jump_values(self): #will return the predicted jump values (Taken or Not Taken) from the chosen predictor
+    def predict_jump_values(self): #gets the predicted jump values (Taken or Not Taken) from the chosen predictor
         self.predicted_jump_list = self.predictor.get_jumps() 
+        print(self.predicted_jump_list[0:20]) #for debbuging
+        print(self.actual_jump_list[0:20])
         return
 
     def get_stats(self): #returns a dictionary with: correctly predicted taken branches, incorrectly predicted taken branches, correctly predicted not taken branches, incorrectly predicted not taken branches
@@ -85,15 +88,14 @@ class simulator:
                 break
 
         stats['CP_percentage'] = 100*(stats['CP_TB'] + stats['CP_NB'])/(len(self.actual_jump_list))
-        print(len(self.actual_jump_list))
         return stats
 
 
 #-----PREDICTOR CLASSES-----#
 
-class bimodal_pred:
+#Bi-modal predictor:
 
-    
+class bimodal_pred:
 
     def __init__(self,s,pc_bits,actual_jump_list):
         print('Initializing bimodal predictor...')
@@ -102,33 +104,35 @@ class bimodal_pred:
         self.bht = [0] * (2 ** s)
         return
     
-
     def get_jumps(self): #will return the predicted jumps
         print('Predicting jumps...')
 
         predicted_jumps = []    #predicted jumps list to be returned by function
 
-        for i in range(len(self.actual_jump_list)):
-            predicted_jumps.append(self.predict(self.pc_bits[i]))
-            self.update_bth(i)
+        for i in range(len(self.actual_jump_list)): #iterates over instructions, predicts jumps and updates BHT according to the actual jumps made
+            predicted_jumps.append(self.predict(self.pc_bits[i]))   #computes the i-th prediction
+            self.update_bth(i)                                      #updates BHT on i-th jump value
 
         print('Done!')
         return predicted_jumps
         
-
-    def update_bth(self, i):  #updates the bht according to the jump value of the i-th instruction
+    def update_bth(self, i):  #updates the BHT according to the jump value of the i-th instruction
         bits = self.pc_bits[i]
         if self.bht[int(bits,2)] >= 0 and self.bht[int(bits,2)] < 3 and self.actual_jump_list[i] == 'T':
             self.bht[int(bits,2)] += 1
         elif self.bht[int(bits,2)] > 0 and self.bht[int(bits,2)] <= 3 and self.actual_jump_list[i] == 'N':
             self.bht[int(bits,2)] -= 1
-        return
+        else:
+            return
 
-    def predict(self, bits): #returns 'N' or 'T' chars, depending on prediction for jump on given PC bits value
-        if self.bht[int(bits,2)] < 3:
+    def predict(self, bits): #returns 'N' or 'T' char, depending on prediction for jump on given PC bits value
+        if self.bht[int(bits,2)] < 2:
             return 'N'
-        elif self.bht[int(bits,2)] > 2:
+        elif self.bht[int(bits,2)] > 1:
             return 'T'
+
+
+#Global history predictor (Gshare):
 
 class global_history_pred:
 
@@ -141,6 +145,10 @@ class global_history_pred:
         print('Predicting jumps...')
         return
 
+
+
+#Private history predictor (Pshare):
+
 class private_history_pred:
 
     def __init__(self, reg_size):
@@ -151,6 +159,10 @@ class private_history_pred:
     def get_jumps(self): #will return the predicted jumps **WIP
         print('Predicting jumps...')
         return
+
+
+
+#Tournament predictor:
 
 class tournament_pred:
     
