@@ -154,88 +154,78 @@ class global_history_pred:
 
 class private_history_pred:
 
-    def __init__(self,s, ph, pc_bits,actual_jump_list):
-        print('Initializing private history predictor...')
-        bht_size =  2 ** ph
-        pht_size = 2 ** s
+    def __init__(self, s, ph, pc_bits, actual_jump_list):
+        print("Initializing PShare predictor...")
+        self.reg_size = 2 ** s
+        self.s = s
         self.ph = ph
         self.pc_bits = pc_bits
         self.actual_jump_list = actual_jump_list
-        self.bht = [[[0,1]]*bht_size]*bht_size #BHT table, dimensions of 2^ph x 2^ph with 2BC per entry; initialized in strongly not taken state
-        self.pht = [[0]*ph] * pht_size
+        self.pht = [0] * self.reg_size
+        self.bht = [[0] * 2** ph] * self.reg_size #0 being Strongly not taken
         return
 
-    def get_jumps(self): #will return the predicted jumps **WIP
+    def get_jumps(self):
         print('Predicting jumps...')
+
         predicted_jumps = []    #predicted jumps list to be returned by function
 
-        for i in range(len(self.actual_jump_list)): #iterates over instructions, predicts jumps and updates BHT according to the actual jumps made
-            predicted_jumps.append(self.predict(self.pc_bits[i]))   #computes the i-th prediction
-            self.update_bht_pht(i)                                      #updates BHT on i-th jump value
+        for i in range(len(self.actual_jump_list)):
+            predicted_jumps.append(self.predict(i))   #computes the i-th prediction
+            self.update_bht(i)                    #updates BHT on i-th jump value
+            self.update_pht(i)
 
         print('Done!')
         return predicted_jumps
 
-    def get_bht_index (self, pc_bits):    #gets BHT index value by performing XOR function between pc_LSbs and PHT corresponding entry
-        pht_bits = self.pht[int(pc_bits,2)]
-        xor_bits = ''
-        bc_index = 0
-        for i in range (self.ph):
 
-            #Get the right column or branch counter index:
-            bc_index += pht_bits[i]* (2**i) 
+    def xor (self, i):
+        #self.pht[int(self.pc_bits[i],2)] = self.pht[int(self.pc_bits[i],2)] & (2**self.ph -1)
+        xor =  self.pht[int(self.pc_bits[i],2)] ^ int(self.pc_bits[i][-self.ph:],2)
+        return xor
 
-            #XOR function: gets the right row, or PC entry index
-            if pht_bits[i] == pc_bits[-len(pht_bits)+1:]:
-                xor_bits += '1'
-            else:
-                xor_bits += '0'
-        for bit1, bit2 in zip(pht_bits, pc_bits[-self.ph:]):
-            if (bit1)^int(bit2):
-                xor_bits += '1'
-            else:
-                xor_bits += '0'
+    def update_bht (self, i):
+        pc_bits = self.pc_bits[i]
+        pht_index = int(pc_bits,2)
+        bht_index0 = self.xor(i)
+        bht_index1 = self.pht[pht_index]
+        if self.actual_jump_list[i] == 'T' and self.bht[bht_index0][bht_index1] >= 0 and self.bht[bht_index0][bht_index1] < 3:
+            self.bht[bht_index0][bht_index1] += 1
+        elif self.actual_jump_list[i] == 'N' and self.bht[bht_index0][bht_index1] > 0 and self.bht[bht_index0][bht_index1] <= 3:
+            self.bht[bht_index0][bht_index1] -= 1
 
-        return int(xor_bits,2), bc_index
+    def update_pht(self, i):
+        pc_bits = self.pc_bits[i]
+        pht_index = int(pc_bits,2)
 
-    def update_bht_pht (self, i):
-        bits = self.pc_bits[i]
-        bht_index, bc_index = self.get_bht_index(bits)
         if self.actual_jump_list[i] == 'T':
-            #bht is updated:
-            if self.bht[bht_index][bc_index] == [0,1]:
-                self.bht[bht_index][bc_index] = [0,0]
-            elif self.bht[bht_index][bc_index] == [0,0]:
-                self.bht[bht_index][bc_index] = [1,0]
-            elif self.bht[bht_index][bc_index] == [1,0]:
-                self.bht[bht_index][bc_index] = [1,1]
-            else:
-                self.bht[bht_index][bc_index] = self.bht[bht_index][bc_index]
-            #pht is updated (shifting tuple to the left, replacing LSb with 1):
-            self.pht[int(bits, 2)] = self.pht[int(bits, 2)][1:] + [1]
 
+            #PHT entry is shifted to the left, inserting a '1' in LSb:
+            shifted_val = self.pht[pht_index] << 1
+            if shifted_val < 2**self.ph: #if no 1s "drop" from MSb
+                self.pht[pht_index] = shifted_val + 1
+            else:   #if a 1 "drops" from MSb
+                self.pht[pht_index] = shifted_val - 2**self.ph + 1
 
         else:
-            #bht is updated:
-            if self.bht[bht_index][bc_index] == [1,1]:
-                self.bht[bht_index][bc_index] = [1,0]
-            elif self.bht[bht_index][bc_index] == [1,0]:
-                self.bht[bht_index][bc_index] = [0,0]
-            elif self.bht[bht_index][bc_index] == [0,0]:
-                self.bht[bht_index][bc_index] = [0,1]
-            else:
-                self.bht[bht_index][bc_index] = self.bht[bht_index][bc_index]
-            #pht is updated (shifting list to the left, replacing LSb with 0):
-            self.pht[int(bits, 2)] = self.pht[int(bits, 2)][1:] + [0]
 
-            
+            #PHT entry is shiftet to the left, inserting a '0' in LSb:
+            shifted_val = self.pht[pht_index] << 1
+            if shifted_val < 2**self.ph: #if no 1s "drop" from MSb
+                self.pht[pht_index] = shifted_val
+            else:   #if a 1 "drops" from MSb
+                self.pht[pht_index] = shifted_val - 2**self.ph
 
-    def predict (self, bits):
-        bht_index, bc_index = self.get_bht_index(bits)
-        if self.bht[bht_index][bc_index][0] == 0:
-            return 'N'
-        else:
+    def predict(self, i):
+        pc_bits = self.pc_bits[i]
+        pht_index = int(pc_bits,2)
+        bht_index0 = self.xor(i)
+        bht_index1 = self.pht[pht_index]
+        prediction = self.bht[bht_index0][bht_index1]
+        if prediction > 1:
             return 'T'
+        else:
+            return 'N'
 
 #Tournament predictor:
 
