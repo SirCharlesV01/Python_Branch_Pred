@@ -1,0 +1,10 @@
+image: python
+ 
+stages:
+    - test
+
+test:
+  stage: test
+  script:
+    - echo "Test Stage"
+    - ./compare_results.sh
